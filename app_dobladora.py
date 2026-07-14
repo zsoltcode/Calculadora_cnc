@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 
 # ==========================================
-# NUEVA VERSIÓN: AMADA CNC (Versión Final y Organizada)
+# NUEVA VERSIÓN: AMADA CNC (Corregida)
 # ==========================================
 
 # Funciones de conversión
@@ -13,55 +13,6 @@ def inches_to_mm(inches):
 def mm_to_inches(mm):
     return mm / 25.4
 
-# Funciones de cálculo mejoradas
-def calcular_tonelaje(espesor, v_real, longitud_doblez, factor_fuerza):
-    """Calcula el tonelaje correctamente"""
-    if v_real == 0:
-        return 0
-    # Fórmula más precisa: (575 * t^2) / V * L * factor
-    tonelaje = ((575 * (espesor ** 2)) / v_real) * longitud_doblez * factor_fuerza
-    return tonelaje
-
-def calcular_ala_minima(v_real, material):
-    """Calcula ala mínima según material"""
-    factores = {
-        "Acero Estándar (Cold Rolled)": 0.7,
-        "Acero Inoxidable": 0.8,
-        "Aluminio": 0.6
-    }
-    factor = factores.get(material, 0.7)
-    return v_real * factor
-
-def calcular_radio_interior(v_real):
-    """Calcula radio interior"""
-    return v_real / 6
-
-def calcular_deduccion(espesor, material):
-    """Calcula deducción según material"""
-    factores = {
-        "Acero Estándar (Cold Rolled)": 1.5,
-        "Acero Inoxidable": 1.8,
-        "Aluminio": 1.2
-    }
-    factor = factores.get(material, 1.5)
-    return espesor * factor
-
-def calcular_angulo_programado(grados, material):
-    """Calcula ángulo programado con retorno elástico"""
-    retornos = {
-        "Acero Estándar (Cold Rolled)": 1.5,
-        "Acero Inoxidable": 3.0,
-        "Aluminio": 1.0
-    }
-    retorno = retornos.get(material, 1.5)
-    return grados - retorno
-
-# Función para calcular matriz ideal sin referencias fijas
-def calcular_matriz_ideal(espesor):
-    """Calcula la matriz ideal basada en el espesor (8 veces el espesor)"""
-    return espesor * 8
-
-# Convertir valores a pulgadas para cálculos internos
 def convert_to_inches(value, unit):
     if unit == "Milímetros":
         return mm_to_inches(value)
@@ -74,8 +25,49 @@ def convert_from_inches(value, unit):
 
 def format_value(value, unit):
     if unit == "Milímetros":
-        return f"{value:.2f} mm"
+        # Ahora sí aplicamos la conversión inversa antes de mostrar el dato
+        val_mm = convert_from_inches(value, unit)
+        return f"{val_mm:.2f} mm"
     return f"{value:.3f}\""
+
+# Funciones de cálculo mejoradas
+def calcular_tonelaje(espesor, v_real, longitud_doblez, factor_fuerza):
+    """Calcula el tonelaje correctamente"""
+    if v_real == 0:
+        return 0
+    # Corrección matemática: Se debe dividir entre 12 para calcular toneladas por pulgada
+    tonelaje = ((575 * (espesor ** 2)) / v_real / 12) * longitud_doblez * factor_fuerza
+    return tonelaje
+
+def calcular_ala_minima(v_real, material):
+    factores = {
+        "Acero Estándar (Cold Rolled)": 0.7,
+        "Acero Inoxidable": 0.8,
+        "Aluminio": 0.6
+    }
+    return v_real * factores.get(material, 0.7)
+
+def calcular_radio_interior(v_real):
+    return v_real / 6
+
+def calcular_deduccion(espesor, material):
+    factores = {
+        "Acero Estándar (Cold Rolled)": 1.5,
+        "Acero Inoxidable": 1.8,
+        "Aluminio": 1.2
+    }
+    return espesor * factores.get(material, 1.5)
+
+def calcular_angulo_programado(grados, material):
+    retornos = {
+        "Acero Estándar (Cold Rolled)": 1.5,
+        "Acero Inoxidable": 3.0,
+        "Aluminio": 1.0
+    }
+    return grados - retornos.get(material, 1.5)
+
+def calcular_matriz_ideal(espesor):
+    return espesor * 8
 
 # Configuración inicial
 st.set_page_config(page_title="Amada CNC Calculator", layout="wide")
@@ -87,13 +79,10 @@ tab1, tab2 = st.tabs(["📊 Cálculo Principal", "🧮 Desarrollo"])
 
 # PESTAÑA 1: Cálculo Principal
 with tab1:
-    # Selector de unidad
     unidad = st.radio("Selecciona la unidad:", ("Pulgadas", "Milímetros"), horizontal=True)
     
-    # Panel de configuración
     st.header("🔧 Configuración de Parámetros")
     
-    # Panel de datos del material
     st.header("1. Datos del Material")
     material = st.selectbox("Tipo de Material:", ["Acero Estándar (Cold Rolled)", "Acero Inoxidable", "Aluminio"])
     
@@ -117,7 +106,6 @@ with tab1:
         )
         longitud_doblez = convert_to_inches(longitud_doblez_input, unidad)
     
-    # Panel de datos de la pieza
     st.header("2. Datos de la Pieza")
     col_input3, col_input4 = st.columns(2)
     with col_input3:
@@ -132,57 +120,47 @@ with tab1:
         )
         ala_deseada = convert_to_inches(ala_deseada_input, unidad)
     
-    # Panel de cálculo de matrices
     st.header("3. Cálculo de Matrices")
     st.info("La matriz se calcula automáticamente según el espesor ingresado")
     
-    # Cálculo de matrices basado en el espesor
-    # Regla clásica: V = 8 veces el espesor
     apertura_v_ideal = calcular_matriz_ideal(espesor)
     
-    # Mostrar cálculo de matrices
     col_matrix1, col_matrix2 = st.columns(2)
     
     with col_matrix1:
-        st.metric("V Ideal", f"{apertura_v_ideal:.3f}\"")
+        st.metric("V Ideal", format_value(apertura_v_ideal, unidad))
         st.info("8 veces el espesor (regla clásica)")
     
     with col_matrix2:
-        # Recomendación basada en el espesor
         if apertura_v_ideal < 0.157:
-            recomendacion = "Usar V = 0.157\" (mínima disponible)"
+            recomendacion = f"Usar V = {format_value(0.157, unidad)} (mínima disponible)"
             v_recomendada = 0.157
         elif apertura_v_ideal > 0.630:
-            recomendacion = "Usar V = 0.630\" (máxima disponible)"
+            recomendacion = f"Usar V = {format_value(0.630, unidad)} (máxima disponible)"
             v_recomendada = 0.630
         else:
-            recomendacion = f"Usar V ≈ {apertura_v_ideal:.3f}\""
+            recomendacion = f"Usar V ≈ {format_value(apertura_v_ideal, unidad)}"
             v_recomendada = apertura_v_ideal
         
         st.metric("Recomendación", recomendacion)
         st.info("Matriz recomendada para tu espesor")
     
-    # Panel de tonelaje
     st.header("4. Cálculo de Tonelaje")
     col_ton1, col_ton2 = st.columns(2)
     
     with col_ton1:
         st.subheader("📊 Tonelaje Estimado")
         
-        # Factores de material
         factores_material = {
             "Acero Estándar (Cold Rolled)": 1.0,
             "Acero Inoxidable": 1.5,
             "Aluminio": 0.5
         }
-        
         factor_fuerza = factores_material[material]
         
-        # Cálculo de tonelaje con la matriz recomendada
         tonelaje_recomendado = calcular_tonelaje(espesor, v_recomendada, longitud_doblez, factor_fuerza)
         st.metric("Tonelaje Recomendado", f"{tonelaje_recomendado:.1f} US Tons")
         
-        # Alertas de tonelaje
         if tonelaje_recomendado > 150:
             st.error("⚠️ ¡ATENCIÓN! Tonelaje muy alto, puede sobrecargar la máquina")
         elif tonelaje_recomendado > 100:
@@ -190,9 +168,7 @@ with tab1:
     
     with col_ton2:
         st.subheader("📋 Información Técnica")
-        
-        # Mostrar información sobre matrices
-        st.write("**Matrices Disponibles (pulgadas):**")
+        st.write("**Matrices Disponibles (pulgadas/mm):**")
         st.write("- 0.157\" (4mm)")
         st.write("- 0.236\" (6mm)") 
         st.write("- 0.315\" (8mm)")
@@ -200,9 +176,8 @@ with tab1:
         st.write("- 0.472\" (12mm)")
         st.write("- 0.630\" (16mm)")
         
-        st.write(f"**Escala recomendada:** V = 8 × Espesor = {apertura_v_ideal:.3f}\"")
+        st.write(f"**Escala recomendada:** V = 8 × Espesor = {format_value(apertura_v_ideal, unidad)}")
     
-    # Panel de parámetros adicionales
     st.header("5. Parámetros Adicionales")
     col_params1, col_params2 = st.columns(2)
     
@@ -214,16 +189,14 @@ with tab1:
         radio_interior = calcular_radio_interior(v_recomendada)
         angulo_programado = calcular_angulo_programado(grados, material)
         
-        st.metric("Deducción", f"{deduccion:.3f}\"")
-        st.metric("Ala Mínima", f"{ala_minima:.3f}\"")
-        st.metric("Radio Interior", f"{radio_interior:.3f}\"")
+        st.metric("Deducción", format_value(deduccion, unidad))
+        st.metric("Ala Mínima", format_value(ala_minima, unidad))
+        st.metric("Radio Interior", format_value(radio_interior, unidad))
         st.metric("Ángulo Programado", f"{angulo_programado:.1f}°")
     
     with col_params2:
         st.subheader("🔍 Análisis")
-        
-        # Análisis de la recomendación
-        if apertura_v_ideal >= 0.157 and apertura_v_ideal <= 0.630:
+        if 0.157 <= apertura_v_ideal <= 0.630:
             diferencia = abs(apertura_v_ideal - v_recomendada)
             if diferencia < 0.01:
                 st.success("✅ Matriz recomendada muy cercana al ideal")
@@ -234,45 +207,21 @@ with tab1:
         else:
             st.info("⚠️ Extremo de rango de matrices")
         
-        # Información sobre el espesor
         st.info(f"Espesor: {espesor_input} {unidad}")
         st.info(f"Longitud doblada: {longitud_doblez_input} {unidad}")
     
-    # Botón de cálculo
     if st.button("Calcular Parámetros de Máquina", type="primary"):
         
-        # --- 1. PROPIEDADES DEL MATERIAL ---
-        if material == "Acero Estándar (Cold Rolled)":
-            factor_fuerza = 1.0; retorno_elastico = 1.5  
-        elif material == "Acero Inoxidable":
-            factor_fuerza = 1.5; retorno_elastico = 3.0  
-        else: 
-            factor_fuerza = 0.5; retorno_elastico = 1.0  
-            
-        # --- 2. CÁLCULO DE MATRICES ---
-        # Regla clásica: V = 8 veces el espesor
-        apertura_v_ideal = calcular_matriz_ideal(espesor)
+        # Aprovechamos las funciones estructuradas para el cálculo final
+        tonelaje_requerido = calcular_tonelaje(espesor, v_recomendada, longitud_doblez, factor_fuerza)
         
-        # Matriz recomendada (basada en el espesor)
-        if apertura_v_ideal < 0.157:
-            v_recomendada = 0.157
-        elif apertura_v_ideal > 0.630:
-            v_recomendada = 0.630
-        else:
-            v_recomendada = apertura_v_ideal
-            
-        # --- 3. MATEMÁTICAS (SISTEMA IMPERIAL) ---
-        # Fórmula imperial empírica para US Tons: (575 * t^2) / V * L
-        tonelaje_requerido = ((575 * (espesor ** 2)) / v_recomendada) * longitud_doblez * factor_fuerza
+        deduccion_real = calcular_deduccion(espesor, material)
+        eje_x = ala_deseada - (deduccion_real / 2)
         
-        # Deducción y radio
-        deduccion_simple = espesor * 1.5 
-        eje_x = ala_deseada - (deduccion_simple / 2)
-        angulo_maquina = grados - retorno_elastico
-        ala_minima = v_recomendada * 0.7
-        radio_interior = v_recomendada / 6
+        angulo_maquina = calcular_angulo_programado(grados, material)
+        ala_minima_req = calcular_ala_minima(v_recomendada, material)
+        radio_interior_req = calcular_radio_interior(v_recomendada)
     
-        # --- 4. MOSTRAR RESULTADOS ---
         st.markdown("---")
         st.subheader("📊 Resultados para Amada CNC")
         res_col1, res_col2 = st.columns(2)
@@ -284,22 +233,18 @@ with tab1:
             
         with res_col2:
             st.warning(f"📐 **Ángulo a programar:** {angulo_maquina:.1f}°")
-            st.success(f"🔄 **Radio Interior:** {format_value(radio_interior, unidad)}") 
-            st.info(f"🛑 **Ala Mínima:** {format_value(ala_minima, unidad)}")
+            st.success(f"🔄 **Radio Interior:** {format_value(radio_interior_req, unidad)}") 
+            st.info(f"🛑 **Ala Mínima:** {format_value(ala_minima_req, unidad)}")
     
-        # --- 5. ALERTAS ---
-        if ala_deseada < ala_minima:
+        if ala_deseada < ala_minima_req:
             st.error(f"⚠️ **¡CUIDADO!** El ala de {format_value(ala_deseada, unidad)} es muy corta para la matriz de {format_value(v_recomendada, unidad)}.")
 
 # PESTAÑA 2: Desarrollo
 with tab2:
     st.header("🧮 Desarrollo de Cálculo de Material")
+    st.write("Esta sección permite calcular el material necesario para piezas con características especiales (Unidades operan base Pulgadas).")
     
-    st.write("Esta sección permite calcular el material necesario para piezas con características especiales.")
-    
-    # Panel de cálculo de material con costillas
     st.subheader("📋 Cálculo de Material con Costillas")
-    
     col_mat1, col_mat2 = st.columns(2)
     
     with col_mat1:
@@ -308,44 +253,32 @@ with tab2:
         ancho_original = st.number_input("Ancho original (pulgadas)", min_value=0.1, value=8.0, step=0.1)
         espesor_material = st.number_input("Espesor del material (pulgadas)", min_value=0.01, value=0.060, step=0.001)
         
-        # Opciones para costillas
         tiene_costillas = st.checkbox("¿La pieza tiene costillas?")
         
         if tiene_costillas:
             num_costillas = st.number_input("Número de costillas", min_value=0, value=0)
             costillas = []
             
-            for i in range(num_costillas):
+            for i in range(int(num_costillas)):
                 st.write(f"#### Costilla {i+1}")
                 tipo = st.selectbox(f"Tipo de costilla {i+1}", ["V", "Media Luna"], key=f"tipo_{i}")
-                longitud = st.number_input(f"Longitud de costilla {i+1}", 
-                                        min_value=0.1, value=1.0, step=0.1, key=f"long_{i}")
-                posicion = st.number_input(f"Posición de costilla {i+1}", 
-                                        min_value=0.0, value=0.0, step=0.1, key=f"pos_{i}")
+                longitud = st.number_input(f"Longitud de costilla {i+1}", min_value=0.1, value=1.0, step=0.1, key=f"long_{i}")
+                posicion = st.number_input(f"Posición de costilla {i+1}", min_value=0.0, value=0.0, step=0.1, key=f"pos_{i}")
                 
-                costillas.append({
-                    'tipo': tipo.lower(),
-                    'longitud': longitud,
-                    'posicion': posicion
-                })
+                costillas.append({'tipo': tipo.lower(), 'longitud': longitud, 'posicion': posicion})
     
     with col_mat2:
         st.write("### Resultados de Cálculo")
         
-        # Cálculo de material base
         material_base = longitud_original * ancho_original * espesor_material
         st.metric("Material Base", f"{material_base:.2f} pulg³")
         
-        # Cálculo de material con costillas
-        if tiene_costillas and costillas:
-            # Cálculo aproximado de material adicional por costillas
+        if tiene_costillas and 'costillas' in locals():
             material_adicional = 0
             for costilla in costillas:
                 if costilla['tipo'] == 'v':
-                    # Para costillas en V, añadimos material adicional
                     material_adicional += costilla['longitud'] * 0.1 * espesor_material
                 elif costilla['tipo'] == 'media_luna':
-                    # Para medias lunas, añadimos material circular
                     material_adicional += (costilla['longitud'] * 0.5 * espesor_material) * 0.5
             
             material_total = material_base + material_adicional
@@ -354,15 +287,12 @@ with tab2:
         else:
             st.metric("Material Total", f"{material_base:.2f} pulg³")
         
-        # Desperdicio
         desperdicio = st.slider("Porcentaje de desperdicio (%)", 0, 20, 10)
         material_con_desperdicio = material_base * (1 + desperdicio/100)
         st.metric("Material con Desperdicio", f"{material_con_desperdicio:.2f} pulg³")
         
-        # Cálculo de peso (aproximado)
-        peso_base = material_base * 0.283  # Densidad del acero en lb/pulg³
-        st.metric("Peso Estimado", f"{peso_base:.2f} lbs")
+        peso_base = material_base * 0.283
+        st.metric("Peso Estimado (Acero)", f"{peso_base:.2f} lbs")
         
-        # Cálculo de área
         area_base = longitud_original * ancho_original
         st.metric("Área Base", f"{area_base:.2f} pulg²")
